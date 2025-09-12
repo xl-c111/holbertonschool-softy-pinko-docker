@@ -1,4 +1,8 @@
+# Use latest Ubuntu as base image
 FROM ubuntu:latest
+# Update package list
 RUN apt-get update
-RUN apt-get update -y
-CMD echo "Hello, World!"
+# Upgrade installed packages
+RUN apt-get upgrade -y
+# Default command (recommended JSON array form)
+CMD ["echo", "Hello, World!"]
