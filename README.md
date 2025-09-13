@@ -1,6 +1,18 @@
-# holbertonschool-softy-pinko-docker
+# Task 6 – Horizontal Scaling with Docker Compose and Nginx Proxy
 
 In **Task 6**, we extend the previous setup (Task 5) by **running multiple back-end API servers** and using **Nginx as a proxy/load balancer**. This allows traffic to be distributed across multiple API servers using the **Round-Robin algorithm**, improving scalability and reliability.
+
+---
+
+## ⚙️ Setup / Prerequisites
+
+- Install [Docker](https://docs.docker.com/get-docker/)
+- Install [Docker Compose](https://docs.docker.com/compose/install/)
+- Clone this repository or copy the `task6/` directory
+
+All dependencies (Flask, Flask-CORS, Nginx) are installed automatically inside Docker containers during the build process.
+
+---
 
 ## 📂 Project Structure
 
@@ -20,16 +32,9 @@ task6/
 │   ├── Dockerfile
 │   └── proxy.conf
 │
-└── docker-compose.yml
+│── docker-compose.yml
+│── 2-api-servers.txt   # contains the command to run 2 API servers
 ```
-
----
-
-## ⚙️ Setup / Prerequisites
-
-- Install [Docker](https://docs.docker.com/get-docker/)
-- Install [Docker Compose](https://docs.docker.com/compose/install/)
-- Clone this repository or copy the `task6/` directory
 
 ---
 
@@ -47,6 +52,8 @@ docker-compose build
 docker-compose up --scale back-end=2
 ```
 
+This command is also saved in `2-api-servers.txt` (required by the checker).
+
 ### Step 3 – Open in browser
 
 - Front-end: [http://localhost/](http://localhost/)
@@ -57,112 +64,9 @@ docker-compose up --scale back-end=2
 Reload `http://localhost/api/hello` multiple times.  
 In your terminal logs you should see alternating requests handled by **back-end-1** and **back-end-2**.
 
-✅ With this setup:
-
-- **Front-end** serves the static UI.
-- **Back-end** serves API responses.
-- **Proxy** unifies them at `http://localhost`.
-- **Docker Compose** manages everything, and scaling is as simple as `--scale back-end=2`.
-
 ---
 
-## ⚙️ File-by-File Explanation
-
-### 1. **back-end/**
-
-- **Dockerfile**
-  - Builds an image based on `ubuntu:latest`.
-  - Installs Python3 and Flask.
-  - Installs `flask-cors` to handle cross-origin requests.
-  - Copies `api.py` into the container.
-  - Runs the Flask server on **port 5252**.
-
-- **api.py**
-  - A simple Flask app exposing an endpoint like:
-    ```python
-    @app.route("/api/hello")
-    def hello():
-        return "Hello, World!"
-    ```
-  - Responds with `"Hello, World!"` to test communication between front-end and back-end.
-
-- **requirements.txt**
-  - Lists Python dependencies (`flask`, `flask-cors`).
-  - Ensures the build installs the correct versions consistently.
-
----
-
-### 2. **front-end/**
-
-- **Dockerfile**
-  - Uses the `nginx:latest` image.
-  - Copies static front-end files (HTML, CSS, JS) into `/var/www/html/softy-pinko-front-end`.
-  - Copies the Nginx config `softy-pinko-front-end.conf` to serve those files.
-  - Exposes **port 9000** internally for other containers.
-
-- **softy-pinko-front-end/**
-  - Contains the Softy Pinko template (index.html, CSS, JS, assets).
-  - Displays the **Hello, World! landing page**.
-
-- **softy-pinko-front-end.conf**
-  - Configures Nginx to serve files from `/var/www/html/softy-pinko-front-end` on port **9000**.
-
----
-
-### 3. **proxy/**
-
-- **Dockerfile**
-  - Uses the `nginx:latest` image.
-  - Copies `proxy.conf` to `/etc/nginx/conf.d/default.conf`.
-  - Runs Nginx as the **reverse proxy** and load balancer.
-
-- **proxy.conf**  
-  Configures Nginx to:
-
-  ```nginx
-  server {
-      listen 80;
-
-      # Route root requests to front-end
-      location / {
-          proxy_pass http://front-end:9000;
-      }
-
-      # Route /api requests to back-end (load balanced across multiple)
-      location /api {
-          proxy_pass http://back-end:5252;
-      }
-  }
-  ```
-
-  - `/` → goes to the **front-end container** (port 9000).
-  - `/api` → goes to the **back-end containers** (port 5252).
-  - Nginx automatically balances traffic between **back-end-1** and **back-end-2**.
-
----
-
-### 4. **docker-compose.yml**
-
-Defines and connects all services:
-
-- **back-end**
-  - Builds from `./back-end/Dockerfile`.
-  - Creates **multiple containers** when scaled.
-  - Exposes port **5252** internally (not mapped to host).
-
-- **front-end**
-  - Builds from `./front-end/Dockerfile`.
-  - Serves the static site on port **9000** (internal only).
-  - Depends on back-end.
-
-- **proxy**
-  - Builds from `./proxy/Dockerfile`.
-  - Listens on **host port 80** and forwards requests.
-  - Depends on front-end and back-end.
-
----
-
-## 🔄 How It All Works Together
+## 🔄 How It Works
 
 ### ASCII Flow Diagram
 
@@ -195,3 +99,109 @@ Defines and connects all services:
 
 - Requests to `/` → sent to **Front-end (Nginx)** → serves static website.
 - Requests to `/api` → load-balanced between **Back-end-1** and **Back-end-2**.
+
+### Explanation
+
+- **Browser** sends requests to `http://localhost`.
+- **Proxy (Nginx)** listens on port 80 and routes traffic:
+  - `/` → goes to the **front-end container** (Nginx, port 9000).
+  - `/api` → load-balanced between **back-end containers** (Flask, port 5252).
+- **Front-end** serves static HTML, CSS, and JS.
+- **Back-end** responds with API data (`Hello, World!`).
+- **Docker Compose** orchestrates all containers and networking.
+
+---
+
+## ⚙️ File-by-File Explanation
+
+### 1. **back-end/**
+
+- **Dockerfile**
+  - Builds from `ubuntu:latest`.
+  - Installs Python3, pip3, Flask, and Flask-CORS.
+  - Copies `api.py`.
+  - Runs Flask server on port **5252**.
+
+- **api.py**
+  - Simple Flask app with an `/api/hello` endpoint returning `"Hello, World!"`.
+
+- **requirements.txt**
+  - Defines Python dependencies (Flask, Flask-CORS).
+
+---
+
+### 2. **front-end/**
+
+- **Dockerfile**
+  - Uses `nginx:latest`.
+  - Copies static site into `/var/www/html/softy-pinko-front-end`.
+  - Uses `softy-pinko-front-end.conf` for configuration.
+  - Exposes port **9000** internally.
+
+- **softy-pinko-front-end/**
+  - Static files (HTML, CSS, JS).
+
+- **softy-pinko-front-end.conf**
+  - Configures Nginx to serve static files from `/var/www/html/softy-pinko-front-end`.
+
+---
+
+### 3. **proxy/**
+
+- **Dockerfile**
+  - Uses `nginx:latest`.
+  - Copies `proxy.conf` → `/etc/nginx/conf.d/default.conf`.
+
+- **proxy.conf**  
+  Configures routing:
+
+  ```nginx
+  server {
+      listen 80;
+
+      # Route root requests to front-end
+      location / {
+          proxy_pass http://front-end:9000;
+      }
+
+      # Route /api requests to back-end
+      location /api {
+          proxy_pass http://back-end:5252;
+      }
+  }
+  ```
+
+---
+
+### 4. **docker-compose.yml**
+
+Defines services:
+
+- **back-end**
+  - Build from `./back-end/Dockerfile`.
+  - Can be scaled (`--scale back-end=2`).
+  - Exposes **5252** internally.
+
+- **front-end**
+  - Build from `./front-end/Dockerfile`.
+  - Serves static site on port **9000** internally.
+
+- **proxy**
+  - Build from `./proxy/Dockerfile`.
+  - Listens on **host port 80**.
+  - Routes to front-end and back-end.
+
+---
+
+## ✅ Summary
+
+- **Front-end** → serves UI.
+- **Back-end** → serves API.
+- **Proxy** → unifies access and load-balances requests.
+- **Docker Compose** → manages containers, scaling, and networking.
+
+Scaling horizontally is achieved by running multiple back-end containers with:
+
+```bash
+docker-compose up --scale back-end=2
+```
